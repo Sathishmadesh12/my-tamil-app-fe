@@ -111,6 +111,7 @@ export default function TamilPronounceDemo() {
   const [heard, setHeard] = useState(() => new Set());
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPlayingLetters, setIsPlayingLetters] = useState(false);
+  const [playingLetterIndex, setPlayingLetterIndex] = useState(null);
   const [ttsError, setTtsError] = useState(null);
   const [typeText, setTypeText] = useState("");
   const [typeError, setTypeError] = useState(null);
@@ -160,6 +161,23 @@ export default function TamilPronounceDemo() {
   };
 
 
+  // Plays just the one letter the user tapped inside its own container.
+  const playLetter = async (word, letter, idx) => {
+    setTtsError(null);
+    setPlayingLetterIndex(idx);
+    try {
+      await speakTamil(letter);
+      setHeard((prev) => new Set(prev).add(word.roman));
+    } catch (e) {
+      console.error("TTS error:", e);
+      setTtsError(
+        "இந்த சாதனத்தில் தமிழ் குரல் இல்லை. Piper backend இணைக்கவும்.",
+      );
+    } finally {
+      setPlayingLetterIndex(null);
+    }
+  };
+
   // Free-typing box: speaks whatever Tamil text the user typed, live.
   const playTypedText = async () => {
     const text = typeText.trim();
@@ -185,11 +203,11 @@ export default function TamilPronounceDemo() {
         word={selected}
         cat={cat}
         isPlaying={isPlaying}
-        isPlayingLetters={isPlayingLetters}
+        playingLetterIndex={playingLetterIndex}
         ttsError={ttsError}
         onBack={() => setSelected(null)}
         onPlayWord={() => playWord(selected)}
-        onPlayLetters={() => playWordLetters(selected)}
+        onPlayLetter={(letter, idx) => playLetter(selected, letter, idx)}
       />
     );
   }
@@ -330,13 +348,14 @@ function DetailScreen({
   word,
   cat,
   isPlaying,
-  isPlayingLetters,
+  playingLetterIndex,
   ttsError,
   onBack,
   onPlayWord,
-  onPlayLetters,
+  onPlayLetter,
 }) {
-  const anyPlaying = isPlaying || isPlayingLetters;
+  const letters = splitTamilLetters(word.tamil);
+  const anyPlaying = isPlaying || playingLetterIndex !== null;
   return (
     <div style={s.page}>
       <div style={s.shell}>
@@ -366,38 +385,62 @@ function DetailScreen({
             {cat.title}
           </span>
           <h1 style={s.detailTitle}>
-            &lsquo;{word.tamil}&rsquo; சொல்லைக் கற்கலாம்.
+            <span style={s.detailTitleBlue}>
+              &lsquo;{word.tamil}&rsquo; சொல்லைக் கற்கலாம்.
+            </span>
           </h1>
           <p style={s.detailDesc}>
             {word.roman} என்பது &ldquo;{word.meaning}&rdquo; என்று பொருள்படும்.
             பொத்தானை அழுத்தி உச்சரிப்பைக் கேளுங்கள்.
           </p>
-          <div style={s.btnRow}>
-            <button
-              style={{
-                ...s.listenBtn,
-                background: cat.color,
-              }}
-              className={isPlayingLetters ? "is-speaking" : ""}
-              onClick={onPlayLetters}
-              disabled={anyPlaying}
-            >
-              <Volume2 size={18} />
-              {isPlayingLetters ? "..." : "எழுத்துக்களாகக் கேட்க"}
-            </button>
-            <button
-              style={{
-                ...s.listenBtn,
-                background: cat.color,
-              }}
-              className={isPlaying ? "is-speaking" : ""}
-              onClick={onPlayWord}
-              disabled={anyPlaying}
-            >
-              <Volume2 size={18} />
-              {isPlaying ? "..." : "முழு வார்த்தையாகக் கேட்க"}
-            </button>
+          <p style={s.containerLabel}>எழுத்துக்களாகக் கேட்க · எழுத்தை அழுத்தவும்</p>
+          <div style={s.lettersRow}>
+            {letters.map((letter, idx) => {
+              const active = playingLetterIndex === idx;
+              return (
+                <div
+                  key={idx}
+                  role="button"
+                  tabIndex={0}
+                  style={{
+                    ...s.letterBox,
+                    borderColor: cat.color,
+                    color: cat.color,
+                    background: active ? cat.tint : "#fff",
+                    opacity: anyPlaying && !active ? 0.5 : 1,
+                    cursor: anyPlaying ? "default" : "pointer",
+                  }}
+                  className={active ? "is-speaking" : ""}
+                  onClick={() => !anyPlaying && onPlayLetter(letter, idx)}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && !anyPlaying && onPlayLetter(letter, idx)
+                  }
+                >
+                  {letter}
+                </div>
+              );
+            })}
           </div>
+
+          <p style={s.containerLabel}>முழு வார்த்தையாகக் கேட்க · வார்த்தையை அழுத்தவும்</p>
+          <div
+            role="button"
+            tabIndex={0}
+            style={{
+              ...s.wordBox,
+              borderColor: cat.color,
+              color: cat.color,
+              background: isPlaying ? cat.tint : "#fff",
+              opacity: anyPlaying && !isPlaying ? 0.5 : 1,
+              cursor: anyPlaying ? "default" : "pointer",
+            }}
+            className={isPlaying ? "is-speaking" : ""}
+            onClick={() => !anyPlaying && onPlayWord()}
+            onKeyDown={(e) => e.key === "Enter" && !anyPlaying && onPlayWord()}
+          >
+            {word.tamil}
+          </div>
+
           {ttsError && <p style={s.ttsError}>{ttsError}</p>}
         </div>
       </div>
@@ -636,6 +679,7 @@ const s = {
     borderRadius: 999,
   },
   detailTitle: { fontSize: "1.35rem", margin: 0, lineHeight: 1.4 },
+  detailTitleBlue: { color: "#1d5fbf" },
   ttsError: {
     color: "#a83b4c",
     fontSize: ".78rem",
@@ -649,6 +693,48 @@ const s = {
     lineHeight: 1.6,
     maxWidth: 400,
     margin: 0,
+  },
+  containerLabel: {
+    fontWeight: 700,
+    fontSize: ".78rem",
+    color: sub,
+    margin: "10px 0 0",
+  },
+  lettersRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center",
+    width: "100%",
+  },
+  letterBox: {
+    minWidth: 48,
+    minHeight: 48,
+    borderRadius: 12,
+    border: "2px solid",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "1.3rem",
+    fontWeight: 700,
+    padding: "6px 10px",
+    userSelect: "none",
+    transition: "background .15s ease, opacity .15s ease",
+  },
+  wordBox: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 16,
+    border: "2px solid",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    fontSize: "1.6rem",
+    fontWeight: 700,
+    padding: "14px 20px",
+    userSelect: "none",
+    transition: "background .15s ease, opacity .15s ease",
   },
   listenBtn: {
     marginTop: 6,
