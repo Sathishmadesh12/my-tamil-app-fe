@@ -623,7 +623,7 @@ const s = {
 
   wordGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fill, minmax(84px, 120px))",
     gap: 10,
     padding: "0 16px 16px",
   },
@@ -636,6 +636,9 @@ const s = {
     fontWeight: 700,
     color: ink,
     cursor: "pointer",
+    width: "100%",
+    maxWidth: 120,
+    boxSizing: "border-box",
   },
 
   linkBtn: {
