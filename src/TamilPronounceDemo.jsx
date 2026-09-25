@@ -89,11 +89,28 @@ const CATEGORIES = [
 
 const ALL_WORDS = CATEGORIES.flatMap((c) => c.words);
 
+// Splits Tamil text into individual letters (grapheme clusters), so a
+// combining vowel sign like ெ stays attached to its consonant instead of
+// being read as a separate broken sound. Falls back to a plain character
+// split on very old browsers that lack Intl.Segmenter.
+function splitTamilLetters(text) {
+  if (typeof Intl !== "undefined" && Intl.Segmenter) {
+    const seg = new Intl.Segmenter("ta", { granularity: "grapheme" });
+    return Array.from(seg.segment(text), (s) => s.segment).filter((c) =>
+      c.trim(),
+    );
+  }
+  return Array.from(text).filter((c) => c.trim());
+}
+
+const LETTER_PAUSE_MS = 280;
+
 export default function TamilPronounceDemo() {
   const [openCategory, setOpenCategory] = useState(CATEGORIES[0].id);
   const [selected, setSelected] = useState(null); // word (with catId) or null
   const [heard, setHeard] = useState(() => new Set());
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlayingLetters, setIsPlayingLetters] = useState(false);
   const [ttsError, setTtsError] = useState(null);
   const [typeText, setTypeText] = useState("");
   const [typeError, setTypeError] = useState(null);
@@ -120,6 +137,29 @@ export default function TamilPronounceDemo() {
     }
   };
 
+  // Reads the word out one letter at a time, with a short pause between
+  // each — for practising individual letter sounds before the whole word.
+  const playWordLetters = async (word) => {
+    setTtsError(null);
+    setIsPlayingLetters(true);
+    try {
+      const letters = splitTamilLetters(word.tamil);
+      for (const letter of letters) {
+        await speakTamil(letter);
+        await new Promise((resolve) => setTimeout(resolve, LETTER_PAUSE_MS));
+      }
+      setHeard((prev) => new Set(prev).add(word.roman));
+    } catch (e) {
+      console.error("TTS error:", e);
+      setTtsError(
+        "இந்த சாதனத்தில் தமிழ் குரல் இல்லை. Piper backend இணைக்கவும்.",
+      );
+    } finally {
+      setIsPlayingLetters(false);
+    }
+  };
+
+
   // Free-typing box: speaks whatever Tamil text the user typed, live.
   const playTypedText = async () => {
     const text = typeText.trim();
@@ -145,9 +185,11 @@ export default function TamilPronounceDemo() {
         word={selected}
         cat={cat}
         isPlaying={isPlaying}
+        isPlayingLetters={isPlayingLetters}
         ttsError={ttsError}
         onBack={() => setSelected(null)}
-        onPlay={() => playWord(selected)}
+        onPlayWord={() => playWord(selected)}
+        onPlayLetters={() => playWordLetters(selected)}
       />
     );
   }
@@ -284,7 +326,17 @@ export default function TamilPronounceDemo() {
   );
 }
 
-function DetailScreen({ word, cat, isPlaying, ttsError, onBack, onPlay }) {
+function DetailScreen({
+  word,
+  cat,
+  isPlaying,
+  isPlayingLetters,
+  ttsError,
+  onBack,
+  onPlayWord,
+  onPlayLetters,
+}) {
+  const anyPlaying = isPlaying || isPlayingLetters;
   return (
     <div style={s.page}>
       <div style={s.shell}>
@@ -320,18 +372,32 @@ function DetailScreen({ word, cat, isPlaying, ttsError, onBack, onPlay }) {
             {word.roman} என்பது &ldquo;{word.meaning}&rdquo; என்று பொருள்படும்.
             பொத்தானை அழுத்தி உச்சரிப்பைக் கேளுங்கள்.
           </p>
-          <button
-            style={{
-              ...s.listenBtn,
-              background: cat.color,
-            }}
-            className={isPlaying ? "is-speaking" : ""}
-            onClick={onPlay}
-            disabled={isPlaying}
-          >
-            <Volume2 size={18} />
-            {isPlaying ? "..." : "ஒலியைக் கேட்க"}
-          </button>
+          <div style={s.btnRow}>
+            <button
+              style={{
+                ...s.listenBtn,
+                background: cat.color,
+              }}
+              className={isPlayingLetters ? "is-speaking" : ""}
+              onClick={onPlayLetters}
+              disabled={anyPlaying}
+            >
+              <Volume2 size={18} />
+              {isPlayingLetters ? "..." : "எழுத்துக்களாகக் கேட்க"}
+            </button>
+            <button
+              style={{
+                ...s.listenBtn,
+                background: cat.color,
+              }}
+              className={isPlaying ? "is-speaking" : ""}
+              onClick={onPlayWord}
+              disabled={anyPlaying}
+            >
+              <Volume2 size={18} />
+              {isPlaying ? "..." : "முழு வார்த்தையாகக் கேட்க"}
+            </button>
+          </div>
           {ttsError && <p style={s.ttsError}>{ttsError}</p>}
         </div>
       </div>
@@ -589,13 +655,23 @@ const s = {
     border: "none",
     color: "#fff",
     fontWeight: 700,
-    fontSize: ".95rem",
-    padding: "12px 26px",
+    fontSize: ".92rem",
+    padding: "12px 20px",
     borderRadius: 999,
     display: "flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     cursor: "pointer",
     transition: "box-shadow .2s ease",
+    flex: "1 1 auto",
+    whiteSpace: "nowrap",
+  },
+  btnRow: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    justifyContent: "center",
+    width: "100%",
   },
 };
