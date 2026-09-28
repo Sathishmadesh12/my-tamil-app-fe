@@ -356,6 +356,7 @@ function DetailScreen({
 }) {
   const letters = splitTamilLetters(word.tamil);
   const anyPlaying = isPlaying || playingLetterIndex !== null;
+  const statusText = anyPlaying ? "ஒலிக்கிறது..." : "எழுத்தை அழுத்திக் கேளுங்கள்";
   return (
     <div style={s.page}>
       <div style={s.shell}>
@@ -391,54 +392,91 @@ function DetailScreen({
           </h1>
           <p style={s.detailDesc}>
             {word.roman} என்பது &ldquo;{word.meaning}&rdquo; என்று பொருள்படும்.
-            பொத்தானை அழுத்தி உச்சரிப்பைக் கேளுங்கள்.
+            எழுத்தை அல்லது ஸ்பீக்கரை அழுத்தி உச்சரிப்பைக் கேளுங்கள்.
           </p>
-          <p style={s.containerLabel}>எழுத்துக்களாகக் கேட்க · எழுத்தை அழுத்தவும்</p>
-          <div style={s.lettersRow}>
-            {letters.map((letter, idx) => {
-              const active = playingLetterIndex === idx;
-              return (
-                <div
-                  key={idx}
-                  role="button"
-                  tabIndex={0}
-                  style={{
-                    ...s.letterBox,
-                    borderColor: cat.color,
-                    color: cat.color,
-                    background: active ? cat.tint : "#fff",
-                    opacity: anyPlaying && !active ? 0.5 : 1,
-                    cursor: anyPlaying ? "default" : "pointer",
-                  }}
-                  className={active ? "is-speaking" : ""}
-                  onClick={() => !anyPlaying && onPlayLetter(letter, idx)}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && !anyPlaying && onPlayLetter(letter, idx)
-                  }
-                >
-                  {letter}
-                </div>
-              );
-            })}
+
+          {/* "Let's hear it" style sound card */}
+          <div
+            style={{
+              ...s.soundCard,
+              background: cat.tint,
+              borderColor: cat.color + "33",
+            }}
+          >
+            <div style={s.soundHead}>
+              <span>ஒவ்வொரு ஒலியையும் கேளுங்கள்</span>
+              <span>{letters.length} எழுத்துகள்</span>
+            </div>
+
+            <div style={s.soundBody}>
+              <div style={s.soundTiles}>
+                {letters.map((letter, idx) => {
+                  const active = playingLetterIndex === idx;
+                  return (
+                    <div
+                      key={idx}
+                      role="button"
+                      tabIndex={0}
+                      style={{
+                        ...s.soundTile,
+                        borderColor: active ? cat.color : "transparent",
+                        color: ink,
+                        opacity: anyPlaying && !active ? 0.55 : 1,
+                        cursor: anyPlaying ? "default" : "pointer",
+                      }}
+                      className={active ? "is-speaking" : ""}
+                      onClick={() => !anyPlaying && onPlayLetter(letter, idx)}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" &&
+                        !anyPlaying &&
+                        onPlayLetter(letter, idx)
+                      }
+                    >
+                      <span style={s.soundTileLetter}>{letter}</span>
+                      <Volume2 size={12} color={active ? cat.color : sub} />
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={s.soundDivider} />
+
+              <div
+                role="button"
+                tabIndex={0}
+                style={{
+                  ...s.hearWord,
+                  color: isPlaying ? cat.color : ink,
+                  opacity: anyPlaying && !isPlaying ? 0.55 : 1,
+                  cursor: anyPlaying ? "default" : "pointer",
+                }}
+                className={isPlaying ? "is-speaking" : ""}
+                onClick={() => !anyPlaying && onPlayWord()}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && !anyPlaying && onPlayWord()
+                }
+              >
+                <Volume2 size={26} />
+                <span style={s.hearWordLabel}>வார்த்தை கேட்க</span>
+              </div>
+            </div>
+
+            <div style={s.soundFoot}>
+              <span style={{ ...s.soundWord, color: cat.color }}>
+                {word.tamil}
+              </span>
+              <span style={s.soundStatus}>{statusText}</span>
+            </div>
           </div>
 
-          <p style={s.containerLabel}>முழு வார்த்தையாகக் கேட்க · வார்த்தையை அழுத்தவும்</p>
-          <div
-            role="button"
-            tabIndex={0}
-            style={{
-              ...s.wordBox,
-              borderColor: cat.color,
-              color: cat.color,
-              background: isPlaying ? cat.tint : "#fff",
-              opacity: anyPlaying && !isPlaying ? 0.5 : 1,
-              cursor: anyPlaying ? "default" : "pointer",
-            }}
-            className={isPlaying ? "is-speaking" : ""}
-            onClick={() => !anyPlaying && onPlayWord()}
-            onKeyDown={(e) => e.key === "Enter" && !anyPlaying && onPlayWord()}
-          >
-            {word.tamil}
+          <div style={s.hintRow}>
+            <span style={s.hintItem}>
+              <b style={s.hintNum}>01</b> எழுத்தை அழுத்தவும் · ஒலியைக் கேளுங்கள்
+            </span>
+            <span style={s.hintItem}>
+              <b style={s.hintNum}>02</b> ஸ்பீக்கரை அழுத்தவும் · வார்த்தையைக்
+              கேளுங்கள்
+            </span>
           </div>
 
           {ttsError && <p style={s.ttsError}>{ttsError}</p>}
@@ -739,6 +777,88 @@ const s = {
     userSelect: "none",
     transition: "background .15s ease, opacity .15s ease",
   },
+  soundCard: {
+    width: "100%",
+    boxSizing: "border-box",
+    border: "1px solid",
+    borderRadius: 18,
+    padding: "14px 16px 12px",
+    textAlign: "left",
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+  },
+  soundHead: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 8,
+    fontSize: ".72rem",
+    fontWeight: 600,
+    color: sub,
+  },
+  soundBody: {
+    display: "flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  soundTiles: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+    flex: "1 1 auto",
+  },
+  soundTile: {
+    minWidth: 58,
+    minHeight: 64,
+    boxSizing: "border-box",
+    background: "#fff",
+    border: "2px solid",
+    borderRadius: 14,
+    padding: "8px 10px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    userSelect: "none",
+    boxShadow: "0 1px 3px rgba(44,29,36,.08)",
+    transition: "border-color .15s ease, opacity .15s ease",
+  },
+  soundTileLetter: { fontSize: "1.5rem", fontWeight: 600, lineHeight: 1.1 },
+  soundDivider: {
+    width: 1,
+    alignSelf: "stretch",
+    minHeight: 48,
+    background: "rgba(44,29,36,.12)",
+  },
+  hearWord: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 4,
+    padding: "4px 8px",
+    userSelect: "none",
+    transition: "color .15s ease, opacity .15s ease",
+  },
+  hearWordLabel: { fontSize: ".72rem", fontWeight: 600, color: sub },
+  soundFoot: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  soundWord: { fontSize: ".85rem", fontWeight: 700 },
+  soundStatus: { fontSize: ".72rem", color: sub },
+  hintRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: "6px 20px",
+    marginTop: 4,
+  },
+  hintItem: { fontSize: ".72rem", color: sub },
+  hintNum: { color: ink, marginRight: 4 },
   listenBtn: {
     marginTop: 6,
     border: "none",
